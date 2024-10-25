@@ -13,6 +13,14 @@ class ChessGame:
         self.game_id = game_id
         self.board = chess.Board()  # Initialize the board using python-chess
         self.selected_piece = None
+        self.piece_type_map = {
+            chess.PAWN: 'pawn',
+            chess.ROOK: 'rook',
+            chess.KNIGHT: 'knight',
+            chess.BISHOP: 'bishop',
+            chess.QUEEN: 'queen',
+            chess.KING: 'king',
+        }
 
         # Get the Stockfish path from environment variable
         stockfish_path = os.getenv("STOCKFISH_PATH")
@@ -23,50 +31,46 @@ class ChessGame:
         self.stockfish = Stockfish(stockfish_path)
         self.stockfish.set_depth(15)  # Set Stockfish calculation depth
 
-        self.pieces = ['pawn', 'rook', 'knight', 'bishop', 'queen', 'king']  # Chess pieces
-
     def get_board_state(self):
         # Return the board state in FEN (Forsyth–Edwards Notation)
         return self.board.fen()
 
     def get_random_piece(self):
-        # Choose a random piece type
-        self.selected_piece = random.choice(self.pieces)
-        return self.selected_piece
-
-    def make_move(self, move):
         # Get all legal moves
         legal_moves = list(self.board.legal_moves)
 
-        # Check if the move is legal
-        move_obj = chess.Move.from_uci(move)
-        if move_obj not in legal_moves:
-            return False, "Invalid move"
+        if not legal_moves:
+            return None, "No legal moves available"
 
-        # Ensure that the move involves the randomly selected piece
-        from_square = move_obj.from_square
-        piece = self.board.piece_at(from_square)
+        # Get all pieces that have legal moves
+        pieces_with_moves = self._get_pieces_with_legal_moves(legal_moves)
+        # Randomly select a piece that has legal moves
+        selected_piece = random.choice(list(pieces_with_moves.keys()))
 
-        if not piece:
-            return False, "No piece at the source square"
+        # Store the selected piece
+        self.selected_piece = selected_piece
 
-        if not self.piece_matches_selected(piece):
-            return False, f"You must move a {self.selected_piece}"
+        return selected_piece
 
-        # Make the move
-        self.board.push(move_obj)
-        return True, "Move successful"
-
-    def piece_matches_selected(self, piece):
-        """Ensure that the piece matches the selected piece type"""
-        piece_type = piece.piece_type
-        piece_type_map = {
-            chess.PAWN: 'pawn',
-            chess.ROOK: 'rook',
-            chess.KNIGHT: 'knight',
-            chess.BISHOP: 'bishop',
-            chess.QUEEN: 'queen',
-            chess.KING: 'king',
+    def _get_pieces_with_legal_moves(self, legal_moves):
+        """
+        Returns a dictionary mapping piece types to their legal moves.
+        Example output:
+        {
+            'pawn': [Move1, Move2],
+            'rook': [Move3]
         }
+        """
+        pieces_with_moves = {}
+        for move in legal_moves:
+            piece = self.board.piece_at(move.from_square)
+            if piece:
+                piece_name = self._get_piece_name(piece)
+                if piece_name not in pieces_with_moves:
+                    pieces_with_moves[piece_name] = []
+                pieces_with_moves[piece_name].append(move)
+        return pieces_with_moves
 
-        return piece_type_map.get(piece_type) == self.selected_piece
+    def _get_piece_name(self, piece):
+        """Convert a piece type to a string name"""
+        return self.piece_type_map.get(piece.piece_type)
